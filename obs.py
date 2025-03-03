@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from scipy.signal import medfilt
@@ -217,3 +218,39 @@ def read_telluric(path_telluric, wavlim=[14000,17500]):
         wav_telluric = wav_telluric[ind][::-1]
         flux_telluric = flux_telluric[ind][::-1]
     return wav_telluric, flux_telluric
+
+# photometry
+# PHARO (Palomar) <-- not available?
+# WFCAM (UKIDSS; UKIRT Deep Sky Survey) is referred, so we use WFCAM filter.
+# c.f. https://sites.astro.caltech.edu/palomar/observer/200inchResources/sensitivities.html
+def read_photometry_file(path_obs, band):
+    """Read photometry file.
+
+    Args:
+        path_obs (str): Path to the observed data.
+        band (str): photometric band.
+
+    Returns:
+        wl_min, wl_max, wl_ref, tr_ref, R_p, Rinst_p
+    """
+    if band=='y':
+        file_filter = "UKIRT_WFCAM.J_filter.dat" ##Jband
+        wl_cut = 0 ##CHECK!!
+    elif band=='h':
+        file_filter = "UKIRT_WFCAM.H_filter.dat"
+    wl_cut = 0
+    d = np.genfromtxt(os.path.join(path_obs, file_filter))
+    wl_ref = d[:,0] ##AA
+    tr_ref = d[:,1] ##1.
+
+    wl_min = np.min(wl_ref)+wl_cut
+    wl_max = np.max(wl_ref)-wl_cut
+    dlmd = (wl_max - wl_min) / len(wl_ref)
+    Rinst_p = 0.5 * (wl_min + wl_max) / dlmd
+    #####
+    # wl_min = np.min(1.0e8/np.concatenate(nusd))
+    # wl_max = np.max(1.0e8/np.concatenate(nusd))
+    # Rinst_p = 3257
+    #####
+    R_p = Rinst_p * 2.**5 # 10 x instrumental spectral resolution
+    return wl_min, wl_max, wl_ref, tr_ref, R_p, Rinst_p
