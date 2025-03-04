@@ -9,12 +9,12 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 # %%
 import numpy as np
 from pathlib import Path
-import jax
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 sns.set_context("notebook")
 # %%
+#-----------Settings-----------#
 output_dir = Path("/home/yuikasagi/Develop/exojax/output/multimol/HR7672B/20210624/hmc_wocloud_ulogg_nm/")
 
 order = [43, 44, 45, 57, 58, 59, 60]
@@ -34,6 +34,7 @@ file_model = output_dir / f"models_order{order_connect}.npz"
 
 data_all = np.load(file_all,allow_pickle=True)
 data_model = np.load(file_model,allow_pickle=True)
+#----------------------#
 
 # %%
 ## read data of data_all

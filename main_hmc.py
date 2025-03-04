@@ -23,7 +23,7 @@ import os
 from jax import config
 config.update("jax_enable_x64", False)
 
-#-----------SETTING-----------#
+#-----------Settings-----------#
 import argparse
 import setting
 import numpy as np
@@ -164,11 +164,13 @@ for band_tmp in band_unique:
     ind_tmp = [x==band_tmp for x in sum(band,[])]
     # companion BD
     ld_obs_tmp, f_obs_tmp, f_obserr_tmp, ord_tmp, ld0_tmp = obs.spec(
-        path_spec[band_tmp], path_telluric, band_tmp, np.array(ord_list)[ind_tmp], ord_norm=ord_norm[band_tmp], norm=False)
+        path_spec[band_tmp], path_telluric, band_tmp, np.array(ord_list)[ind_tmp], ord_norm=ord_norm[band_tmp], 
+        norm=False)
 
     # host star
     ld_obs_A_tmp, f_obs_A_tmp, f_obserr_A_tmp, _, _ = obs.spec(
-        path_spec_A[band_tmp], path_telluric, band_tmp, np.array(ord_list)[ind_tmp], ord_norm=ord_norm[band_tmp], norm=False, lowermask=False)
+        path_spec_A[band_tmp], path_telluric, band_tmp, np.array(ord_list)[ind_tmp], ord_norm=ord_norm[band_tmp], 
+        norm=False, lowermask=False)
 
     ld_obs.extend(ld_obs_tmp)
     f_obs.extend(f_obs_tmp)
@@ -202,7 +204,8 @@ for k in range(len(ord_list)):
     nu_max = 1.0e8/(wl_min-5.0)
     Nx = math.ceil(R * np.log(nu_max/nu_min)) + 1 # ueki
     Nx = math.ceil(Nx/2.) * 2 # make even
-    nus_k, wav_k, res_k = wavenumber_grid(wl_min-5.0, wl_max+5.0, Nx,unit="AA", xsmode="premodit", wavelength_order="ascending")
+    nus_k, wav_k, res_k = wavenumber_grid(wl_min-5.0, wl_max+5.0, Nx, 
+                                          unit="AA", xsmode="premodit", wavelength_order="ascending")
     nusd_k = jnp.array(1.0e8/ld_obs[k]) 
     nu_grid_list.append(nus_k)
     wav_list.append(wav_k)
@@ -227,7 +230,8 @@ for k in range(num_ord_list_p):
     nu_max = 1.0e8/(wl_min - 5.0)
     Nx = math.ceil(R_p * np.log(nu_max/nu_min)) + 1 # ueki
     Nx = math.ceil(Nx/2.) * 2 # make even
-    nus_k, wav_k, res_k = wavenumber_grid(wl_min-5., wl_max+5., Nx,unit="AA", xsmode="premodit", wavelength_order="ascending")
+    nus_k, wav_k, res_k = wavenumber_grid(wl_min-5., wl_max+5., Nx, 
+                                          unit="AA", xsmode="premodit", wavelength_order="ascending")
     nus_p.append(nus_k)
     wav_p.append(wav_k[::-1])
     res_p.append(res_k)
@@ -256,7 +260,8 @@ Thigh = 4000.
 Ttyp = 1000.
 dit_grid_resolution = 1.
 multimdb = mul.multimdb(nu_grid_list, crit=1.e-27, Ttyp=Ttyp)
-multiopa = mul.multiopa_premodit(multimdb, nu_grid_list, auto_trange=[Tlow, Thigh], dit_grid_resolution=dit_grid_resolution)
+multiopa = mul.multiopa_premodit(multimdb, nu_grid_list, auto_trange=[Tlow, Thigh], 
+                                 dit_grid_resolution=dit_grid_resolution)
 
 name_atommol = mul.mols_unique
 name_atommol_masked = mul.masked_molmulti
@@ -303,7 +308,8 @@ molmass_list, molmassH2, molmassHe = mul.molmass()
 ## Photometry
 # molecules
 multimdb_p = mul_p.multimdb(nus_p, crit=1.e-27, Ttyp=Ttyp)
-multiopa_p = mul_p.multiopa_premodit(multimdb_p, nus_p, auto_trange=[Tlow, Thigh], dit_grid_resolution=dit_grid_resolution)
+multiopa_p = mul_p.multiopa_premodit(multimdb_p, nus_p, auto_trange=[Tlow, Thigh], 
+                                     dit_grid_resolution=dit_grid_resolution)
 
 name_atommol_p = mul_p.mols_unique
 name_atommol_masked_p = mul_p.masked_molmulti
@@ -409,16 +415,19 @@ def frun(T0, alpha, logg, logvmr, u1, u2, RV, vsini, a, b, logbeta, vtel, logPto
             if(mul.masked_molmulti[k][i] not in ign):
                 xsm = multiopa[k][i].xsmatrix(Tarr, Parr)
                 xsm=jnp.abs(xsm)
-                dtaum.append(layer_optical_depth(dParr, xsm, mmr[mul.mols_num[k][i]]*ONEARR, molmass_list[mul.mols_num[k][i]], g))
+                dtaum.append(layer_optical_depth(dParr, xsm, mmr[mul.mols_num[k][i]]*ONEARR, 
+                                                 molmass_list[mul.mols_num[k][i]], g))
 
         dtau = sum(dtaum)
 
         # CIA
         if(len(cdbH2H2[k].nucia) > 0):
-            dtaucH2H2 = layer_optical_depth_CIA(nu_grid_list[k],Tarr,Parr,dParr,vmrH2,vmrH2,mmw,g,cdbH2H2[k].nucia,cdbH2H2[k].tcia,cdbH2H2[k].logac)
+            dtaucH2H2 = layer_optical_depth_CIA(nu_grid_list[k], Tarr, Parr, dParr, vmrH2, vmrH2, mmw, 
+                                                g, cdbH2H2[k].nucia, cdbH2H2[k].tcia, cdbH2H2[k].logac)
             dtau = dtau + dtaucH2H2
         if(len(cdbH2He[k].nucia) > 0):
-            dtaucH2He=layer_optical_depth_CIA(nu_grid_list[k], Tarr, Parr, dParr, vmrH2, vmrHe, mmw, g, cdbH2He[k].nucia, cdbH2He[k].tcia, cdbH2He[k].logac)
+            dtaucH2He=layer_optical_depth_CIA(nu_grid_list[k], Tarr, Parr, dParr, vmrH2, vmrHe, mmw, 
+                                              g, cdbH2He[k].nucia, cdbH2He[k].tcia, cdbH2He[k].logac)
             dtau = dtau + dtaucH2He
 
         # cloud
@@ -455,7 +464,8 @@ def frun(T0, alpha, logg, logvmr, u1, u2, RV, vsini, a, b, logbeta, vtel, logPto
                 f_obs0 = jnp.nanmedian(mu_k[(ld0_tmp-15<ld_obs[k]) & (ld_obs[k]<ld0_tmp+15)])
         else:
             mu_k = response.ipgauss_sampling(nu_grid_list[k], nu_grid_list[k], Frot, beta_inst, RV, vr_array[k])
-            transmit_k = response.ipgauss_sampling(nu_grid_list[k], nu_grid_list[k], transmit_k, beta_inst, vtel, vr_array[k])
+            transmit_k = response.ipgauss_sampling(nu_grid_list[k], nu_grid_list[k], transmit_k, 
+                                                   beta_inst, vtel, vr_array[k])
             if 'telluric' not in ign:
                 mu_k = mu_k * transmit_k
             mu_itp = jnp.interp(ld_obs[k], nu_grid_list[k], mu_k)
@@ -554,16 +564,19 @@ def frun_p(T0, alpha, logg, Mp, logvmr, u1, u2, RV, vsini, logPtop, taucloud, ba
         for i in range(len(mul_p.masked_molmulti[k])):
             xsm = multiopa_p[k][i].xsmatrix(Tarr, Parr)
             xsm = jnp.abs(xsm)
-            dtaum.append(layer_optical_depth(dParr, xsm, mmr[mul_p.mols_num[k][i]]*ONEARR, molmass_list_p[mul_p.mols_num[k][i]], g))
+            dtaum.append(layer_optical_depth(dParr, xsm, mmr[mul_p.mols_num[k][i]]*ONEARR, 
+                                             molmass_list_p[mul_p.mols_num[k][i]], g))
 
         dtau = sum(dtaum)
 
         # CIA
         if(len(cdbH2H2_p[k].nucia) > 0):
-            dtaucH2H2 = layer_optical_depth_CIA(nus_p[k], Tarr, Parr, dParr, vmrH2, vmrH2, mmw, g, cdbH2H2_p[k].nucia, cdbH2H2_p[k].tcia, cdbH2H2_p[k].logac)
+            dtaucH2H2 = layer_optical_depth_CIA(nus_p[k], Tarr, Parr, dParr, vmrH2, vmrH2, mmw, 
+                                                g, cdbH2H2_p[k].nucia, cdbH2H2_p[k].tcia, cdbH2H2_p[k].logac)
             dtau = dtau + dtaucH2H2
         if(len(cdbH2He_p[k].nucia) > 0):
-            dtaucH2He = layer_optical_depth_CIA(nus_p[k], Tarr, Parr, dParr, vmrH2, vmrHe, mmw, g, cdbH2He_p[k].nucia, cdbH2He_p[k].tcia, cdbH2He_p[k].logac)
+            dtaucH2He = layer_optical_depth_CIA(nus_p[k], Tarr, Parr, dParr, vmrH2, vmrHe, mmw, 
+                                                g, cdbH2He_p[k].nucia, cdbH2He_p[k].tcia, cdbH2He_p[k].logac)
             dtau = dtau + dtaucH2He
 
         # cloud
@@ -709,10 +722,12 @@ def model_opt(params, boost, ign="ign", obs_grid=True, norm=None):
         logvmr_p_j = []
         for i in range(len(name_atommol)):
             if name_atommol[i] == name_atommol_p[j]:
-                logvmr_p_j.append(params[len(params)-len(name_atommol)-len(atommol_unique_p)+i]*boost[len(params)-len(name_atommol)+i])
+                logvmr_p_j.append(params[len(params)-len(name_atommol)-len(atommol_unique_p)+i]
+                                  *boost[len(params)-len(name_atommol)+i])
         if len(logvmr_p_j)==0:
             l = atommol_unique_p.index(name_atommol_p[j])
-            logvmr_p_j.append(params[len(params)-len(atommol_unique_p)+l]*boost[len(params)-len(atommol_unique_p)+l]) 
+            logvmr_p_j.append(params[len(params)-len(atommol_unique_p)+l]
+                              *boost[len(params)-len(atommol_unique_p)+l]) 
         logvmr_p.extend(logvmr_p_j)
     mag = []
     for i in range(num_ord_list_p):
@@ -903,9 +918,11 @@ def model_c(nusd, y1, y1err, y2, y2err, ign="ign", obs_grid=True, norm=None):
     for i in range(num_ord_list_p):
         band_tmp = band_unique[i]
         if band_tmp=='y':
-            _, mag_band = frun_p(T0, alpha, logg, Mp, logvmr_p, u1, u2, RV, vsini, logPtop_y, taucloud, band_use=band_tmp)
+            _, mag_band = frun_p(T0, alpha, logg, Mp, logvmr_p, u1, u2, RV, vsini, 
+                                 logPtop_y, taucloud, band_use=band_tmp)
         elif band_tmp=='h':
-            _, mag_band = frun_p(T0, alpha, logg, Mp, logvmr_p, u1, u2, RV, vsini, logPtop_h, taucloud, band_use=band_tmp)
+            _, mag_band = frun_p(T0, alpha, logg, Mp, logvmr_p, u1, u2, RV, vsini, 
+                                 logPtop_h, taucloud, band_use=band_tmp)
         mag.append([mag_band])
     if y2 is not None:
         y2 = jnp.concatenate(jnp.array(y2))
@@ -998,8 +1015,9 @@ else:
             ind_str, ind_end = ind_end, ind_end+Ndata_y*len(ord_list[k])
         elif band[k][0]=='h':
             ind_str, ind_end = ind_end, ind_end+Ndata_h*(len(ord_list[k]))
-        median_mu1_all.append(np.array([np.array(median_mu1[ind_str:ind_end])],dtype=object))
-        hpdi_mu1_all.append(np.array([np.array(hpdi_mu1[0][ind_str:ind_end]),np.array(hpdi_mu1[1][ind_str:ind_end])],dtype=object))
+        median_mu1_all.append(np.array([np.array(median_mu1[ind_str:ind_end])], dtype=object))
+        hpdi_mu1_all.append(np.array([np.array(hpdi_mu1[0][ind_str:ind_end]), 
+                                      np.array(hpdi_mu1[1][ind_str:ind_end])], dtype=object))
     median_mu1 = median_mu1_all
     hpdi_mu1 = hpdi_mu1_all
 
