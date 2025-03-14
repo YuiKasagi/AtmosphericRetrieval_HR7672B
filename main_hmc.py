@@ -2,10 +2,11 @@
 HMC sample for multiple molecules, originally written by @ykawashima, 
 modified by @HajimeKawahara using exojax.spec.multimol,
 modified by @YuiKasagi for Kasagi et al. (2025)
-"""
-import time
-ts = time.time()
 
+- exojax version 1.5.1
+"""
+
+""" 
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
@@ -16,17 +17,20 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 import sys
 sys.path.insert(0,'/home/yuikasagi/exojax/src')
 sys.path.insert(0,'/home/yuikasagi/radis')
+"""
 
-import jax.numpy as jnp
-import jax
+import time
+ts = time.time()
+
 import os
 from jax import config
-config.update("jax_enable_x64", False)
+config.update("jax_enable_x64", False) # 32-bit mode to save memory
 
-#-----------Settings-----------#
+#----------- <1/6> Settings-----------#
 import argparse
 import setting
 import numpy as np
+import jax.numpy as jnp
 from exojax.spec.multimol import MultiMol
 
 def init(lang):
@@ -150,7 +154,7 @@ if fit_speckle:
     fix_relRV = 0. # relRV
 #-----------------------------#
 
-#-----------Read Files-----------#
+#----------- <2/6> Read Files-----------#
 import obs
 from exojax.utils.grids import wavenumber_grid
 import math
@@ -249,7 +253,7 @@ for k in range(num_ord_list_p):
     magerr_obs.append([dict_magerr_obs[band_unique[k]]])
 #-----------------------------#
 
-#-----------OPACITY-----------#
+#----------- <3/6> Opacity-----------#
 from exojax.spec import contdb
 
 ## High-resolution Spectra
@@ -323,7 +327,7 @@ for k in range(num_ord_list_p):
     cdbH2He_p.append(contdb.CdbCIA(os.path.join(path_data,'H2-He_2011.cia'),nus_p[k]))
 #-----------------------------#
 
-#-----------Models-----------#
+#----------- <4/6> Models-----------#
 from exojax.spec.layeropacity import layer_optical_depth, layer_optical_depth_CIA
 from exojax.spec.atmrt import ArtEmisPure
 from exojax.spec import planck, response
@@ -331,7 +335,7 @@ from exojax.spec.rtransfer import rtrun_emis_pureabs_fbased2st
 from exojax.spec.spin_rotation import convolve_rigid_rotation
 from exojax.utils.instfunc import resolution_to_gaussian_std
 from exojax.utils.grids import velocity_grid
-from io import powerlaw_temperature_ptop, scale_speckle
+from utils import powerlaw_temperature_ptop, scale_speckle
 
 # resolution
 Rinst = 100000. #instrumental spectral resolution
@@ -499,7 +503,7 @@ def calc_photo(mu, band):
     mu = jnp.concatenate(mu)
     #mu = mu * f_ref # [erg/s/cm^2/cm^{-1}]
     # [erg/s/cm^2/cm^{-1}] => [erg/s/cm^2/cm]
-    mu = mu / ((wavd_p[int(int(band=='h')*(num_ord_list_p-1))])*1.0e-8)**2.0e0
+    mu = mu / ((wavd_p[int(int(band=='h')*(num_ord_list_p-1))])*1.0e-8)**2.0e0 ##wavd: AA -> cm
     # [erg/s/cm^2/cm] => [W/m^2/um]
     mu = mu * 1.0e-7 * 1.0e4 * 1.0e-4
 
@@ -603,7 +607,7 @@ def frun_p(T0, alpha, logg, Mp, logvmr, u1, u2, RV, vsini, logPtop, taucloud, ba
     return mu, mag
 #-----------------------------#
 
-#-----------Optimization (for setting initial parameters of HMC?)-----------#
+#-----------  <5/6> Optimization (for setting initial parameters of HMC?)-----------#
 def model_opt(params, boost, ign="ign", obs_grid=True, norm=None):
     """Model for optimization
     """
@@ -785,7 +789,7 @@ else:
     params = initpar
 #-----------------------------#
 
-#-----------HMC-----------#
+#-----------  <6/6> HMC-----------#
 from jax import random
 import numpyro.distributions as dist
 import numpyro

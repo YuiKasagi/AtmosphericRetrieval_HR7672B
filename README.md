@@ -6,6 +6,8 @@ The 1D spectra are available in the `data/` directory.
 
 The data reduction of REACH data was performed using [PyIRD](https://github.com/prvjapan/pyird).
 
+This code works with `exojax` version 1.5.1.
+
 ## Files
 
 - `main_hmc.py`: Main code for running Hamiltonian Monte Carlo (HMC). The model fit is performed using both high-resolution spectra and broad-band magnitude.
@@ -23,7 +25,13 @@ The data reduction of REACH data was performed using [PyIRD](https://github.com/
 ## Usage
 
 ### 1. Change Settings
-Modify `main_hmc.py` to adjust:
+Modify `setting.py` to set paths for:
+- The observed spectrum
+- The molecular database
+- The output directory
+- The telluric spectrum
+
+Then, modify `main_hmc.py` to adjust:
 - Molecular species
 - Initial parameters
 - Output directory
@@ -35,6 +43,14 @@ Execute `main_hmc.py` with the `--run` option. The samples will be saved, dividi
 ```bash
 python main_hmc.py --run
 ```
+
+Analysis flow in `main_hmc.py`:
+1. Settings -- Configure parameters
+2. Read Files -- Load observation data
+3. Opacity -- Define opacity settings 
+4. Models -- Define models
+5. Optimization (currently optional) -- Perform optimization
+6. HMC -- Run HMC
 
 ### 3. Connect Output Samples
 Once the MCMC has finished, modify main_hmc.py to specify the path to the created sample file and connect the output samples.
