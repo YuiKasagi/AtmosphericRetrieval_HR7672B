@@ -72,7 +72,7 @@ band_unique = sorted(set(sum(band,[])))[::-1] ## sort y,h
 
 ## Paths
 path_obs, path_data, path_telluric, path_save = setting.set_path()
-save_dir = path_save+"/multimol/"+target+"/"+str(date)+"/hmc_ulogg_nm_tmp/"  ##CHECK!!
+save_dir = path_save+"/multimol/"+target+"/"+str(date)+"/hmc_wocloud_unilogg/"  ##CHECK!!
 if not run:
     file_samples = save_dir+"/samples_order"+num+"_1000.pickle"
 
@@ -229,7 +229,7 @@ tr = {}
 Rinst_p = {}
 mag_obs, magerr_obs = [], []
 for k in range(num_ord_list_p):
-    wl_min, wl_max, wl_ref, tr_ref, R_p, Rinst_p_k = obs.read_photometry_file(band_unique[k])
+    wl_min, wl_max, wl_ref, tr_ref, R_p, Rinst_p_k = obs.read_photometry_file(path_obs, band_unique[k])
     nu_min = 1.0e8/(wl_max + 5.0)
     nu_max = 1.0e8/(wl_min - 5.0)
     Nx = math.ceil(R_p * np.log(nu_max/nu_min)) + 1 # ueki
@@ -265,7 +265,7 @@ Ttyp = 1000.
 dit_grid_resolution = 1.
 multimdb = mul.multimdb(nu_grid_list, crit=1.e-27, Ttyp=Ttyp)
 multiopa = mul.multiopa_premodit(multimdb, nu_grid_list, auto_trange=[Tlow, Thigh], 
-                                 dit_grid_resolution=dit_grid_resolution)
+                                 dit_grid_resolution=dit_grid_resolution, allow_32bit=True)
 
 name_atommol = mul.mols_unique
 name_atommol_masked = mul.masked_molmulti
@@ -313,7 +313,7 @@ molmass_list, molmassH2, molmassHe = mul.molmass()
 # molecules
 multimdb_p = mul_p.multimdb(nus_p, crit=1.e-27, Ttyp=Ttyp)
 multiopa_p = mul_p.multiopa_premodit(multimdb_p, nus_p, auto_trange=[Tlow, Thigh], 
-                                     dit_grid_resolution=dit_grid_resolution)
+                                     dit_grid_resolution=dit_grid_resolution, allow_32bit=True)
 
 name_atommol_p = mul_p.mols_unique
 name_atommol_masked_p = mul_p.masked_molmulti
@@ -336,6 +336,7 @@ from exojax.spec.spin_rotation import convolve_rigid_rotation
 from exojax.utils.instfunc import resolution_to_gaussian_std
 from exojax.utils.grids import velocity_grid
 from utils import powerlaw_temperature_ptop, scale_speckle
+import jax
 
 # resolution
 Rinst = 100000. #instrumental spectral resolution
@@ -357,7 +358,7 @@ for k in range(num_ord_list_p):
     vr_array_p.append(velocity_grid(res_p[k], vsini_max))
 
 # number of layers
-NP = 300.
+NP = 300
 # fixed values for telluric art
 Tfix = 273.
 Pfix = 0.6005
@@ -714,7 +715,7 @@ def model_opt(params, boost, ign="ign", obs_grid=True, norm=None):
             scale_star = 10**logscale_star[band_tmp]
             relRV_tmp = relRV[band_tmp]
             k_use = [i for i,x in enumerate(sum(band,[])) if x==band_tmp]
-            f_speckle = scale_speckle(nusd, nu_grid_list, f_obs_A, scale_star, relRV, obs_grid=obs_grid)
+            f_speckle = scale_speckle(nusd, nu_grid_list, f_obs_A, scale_star, relRV_tmp, obs_grid=obs_grid)
             for k in k_use:
                 mu_k = (1-scale_star)*mu[k] + f_speckle[k]
                 mu_speckle.append(mu_k)
@@ -752,6 +753,25 @@ def objective(params):
     g_mag = jnp.dot(f_mag,f_mag) 
     g += g_mag
     return g
+
+def log_likelihood(params, sigma):
+    """log likelihood
+    """
+    mu, mag, _, _ = model_opt(params, boost)
+
+    # high-resolution spectra
+    sigma2 = jnp.concat(f_obserr)**2 + sigma**2
+    f = (jnp.concatenate(f_obs) - jnp.concatenate(mu)) / jnp.sqrt(sigma2)
+    g = jnp.dot(f, f)
+    g_const = jnp.sum(jnp.log(2 * jnp.pi * sigma2))
+    loglike_spec = - (g + g_const) / 2
+
+    # photometry
+    f_mag = (jnp.concatenate(jnp.array(mag_obs)) - jnp.concatenate(jnp.array(mag))) / jnp.array(magerr_obs)
+    g_mag = jnp.dot(f_mag, f_mag)
+    g_mag_const =  jnp.sum(jnp.log(2 * jnp.pi * jnp.array(magerr_obs))**2)
+    loglike_phot = - (g_mag + g_mag_const) / 2
+    return loglike_spec + loglike_phot
 
 ## Initialization
 # setting rest of initial parameters
@@ -1036,6 +1056,34 @@ else:
         all_save_mu2.append(np.array([median_mu2[k], np.array([hpdi_mu2[0][k],hpdi_mu2[1][k]])], dtype=object))
     np.savez(save_file, all_save, all_save_mu2)
 
+    # search maximum log likelihood (MLE)
+    samples_par = []
+    for name in par_name:
+        samples_par.append(samples[name])
+    samples_par = np.array(samples_par)
+    N_sample = samples_par.shape[1]
+    loglike = []
+    for i in range(N_sample):
+        param_i = samples_par[:,i] / boost
+        sigma_i = samples["sigma"][i]
+        loglike_i = log_likelihood(param_i, sigma_i)
+        loglike.append(loglike_i)
+    loglike = np.array(loglike)
+
+    # save MLE
+    ind_mle = np.argmax(loglike)
+    samples_mle = samples_par[:, ind_mle] 
+    params_mle = samples_par[:, ind_mle] / boost
+    max_loglike = np.max(loglike)
+    assert max_loglike == loglike[ind_mle]
+
+    save_file = save_dir + "/params_mle_order"+num+".npz"
+    np.savez(save_file, max_loglike, samples_mle)
+
+    params_final = params_mle
+    logscale_star_final = samples["logscale_star_h"][ind_mle]
+
+    """
     ## Resulted Models
     # median values of posteriors
     params_final=[]
@@ -1044,7 +1092,7 @@ else:
         params_final.append(sample_med/boost[i])
         if name.startswith('logscale_star'):
             logscale_star_final = np.median(samples[name])
-
+    """
     # total model
     model_post, mag_post, norm, _ = model_opt(params_final, boost)
     # model without telluric
@@ -1070,11 +1118,11 @@ else:
             f_speckle.append(f_speckle_k)
 
     # save
-    save_file = save_dir + "/models_order"+num+".npz"
+    save_file = save_dir + "/models_mle_order"+num+".npz"
     all_save=[]
     for k in range(len(ord_list)):
         all_save_k = [name_atommol_masked[k], ord_list[k], ld_obs[k], f_obs[k],
-                    f_speckle[k], model_wotel[k], transmit[k]]
+                    f_speckle[k], model_post[k], model_wotel[k], transmit[k]]
         model_wo_k = []
         for i in range(len(name_atommol_masked[k])):
             model_wo_k.append(model_wo[i][k])
@@ -1082,7 +1130,7 @@ else:
         all_save_k = np.array(all_save_k, dtype=object)
         all_save.append(all_save_k)
     all_save = np.array(all_save)
-    np.savez(save_file, all_save)
+    np.savez(save_file, all_save, mag_post)
 
 te = time.time()
 print('time = ',te-ts)
