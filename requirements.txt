@@ -1,0 +1,14 @@
+argparse
+astropy
+exojax==1.5.1
+jax==0.4.26
+math
+matplotlib
+numpy==1.26.4
+numpyro
+pandas
+pathlib
+pickle
+scipy
+seaborn
+time

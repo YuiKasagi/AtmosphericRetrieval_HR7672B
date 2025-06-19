@@ -7,6 +7,10 @@ The 1D spectra are available in the `data/` directory.
 The data reduction of REACH data was performed using [PyIRD](https://github.com/prvjapan/pyird).
 
 This code works with `exojax` version 1.5.1.
+You can install the required packages using the `requirements.txt` file by running:
+```
+pip install -r requirements.txt
+```
 
 ## Files
 
