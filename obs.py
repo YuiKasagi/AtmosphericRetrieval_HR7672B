@@ -4,7 +4,17 @@ import pandas as pd
 from scipy.signal import medfilt
 from scipy import interpolate
 
-def spec(path_spec, path_telluric, band, ord_list, ord_norm, norm=True, CH4mask=False, lowermask=True):
+def spec(
+        path_spec, 
+        path_telluric, 
+        band, 
+        ord_list, 
+        ord_norm, 
+        norm=True, 
+        CH4mask=False, 
+        lowermask=True,
+        airmass_ratio=None,
+        ):
     """Read the observed spectrum and normalize it.
 
     Args:
@@ -27,6 +37,9 @@ def spec(path_spec, path_telluric, band, ord_list, ord_norm, norm=True, CH4mask=
     
     dat = pd.read_csv(path_spec, **read_args)
     ld_obs, ord, f_obs_lmd, f_obserr_lmd = dat['wav'], dat['order'], dat['flux'], dat['uncertainty']
+    if airmass_ratio is not None:
+        f_obs_lmd = f_obs_lmd ** airmass_ratio
+        f_obserr_lmd = (airmass_ratio * f_obs_lmd ** (airmass_ratio - 1)) * f_obserr_lmd
     if norm:
         wav_sort, flux_sort, flux_med, nflux, nflux_err = spec_norm(path_spec)
         f_obs_lmd = nflux
@@ -254,3 +267,26 @@ def read_photometry_file(path_obs, band):
     #####
     R_p = Rinst_p * 2.**5 # 10 x instrumental spectral resolution
     return wl_min, wl_max, wl_ref, tr_ref, R_p, Rinst_p
+
+def barycentric_correction(ra_deg, dec_deg, mjd):
+    from astropy.time import Time
+    from astropy.coordinates import SkyCoord, EarthLocation
+    import astropy.units as u
+
+    subaru = EarthLocation.from_geodetic(lat=19.82555556*u.deg, lon=-155.47611111*u.deg, height=4139*u.m)
+    sc = SkyCoord(ra=ra_deg*u.deg, dec=dec_deg*u.deg)
+    time = Time(mjd, format='mjd', scale='utc')
+    barycorr = sc.radial_velocity_correction(obstime=time, location=subaru)
+    barycorr_kms = barycorr.to(u.km/u.s)
+    return barycorr_kms.value
+
+if __name__ == "__main__":
+    mjd = 59390.46496304 #59372.64163201 #
+    # HR7672B
+    #ra_deg = 301.0258333
+    #dec_deg = 17.0702778
+    # HR7672A
+    ra_deg = 301.0259167
+    dec_deg = 17.0701861
+    barycorr = barycentric_correction(ra_deg, dec_deg, mjd)
+    print(barycorr) #km/s

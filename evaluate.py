@@ -1,7 +1,10 @@
 import numpy as np
 
-def reduced_chisquare(data, model, error, dof):
-    chisq = np.sum(((np.concatenate(data) - np.concatenate(model)) / np.concatenate(error))**2)
+def reduced_chisquare(data, model, error, sigma, dof):
+    chisq = np.sum(
+                (np.concatenate(data) - np.concatenate(model))**2 
+                / (np.concatenate(error)**2 + sigma**2)
+                )
     return chisq, chisq / dof
 
 def bayesian_information_criterion(loglike, n_params, n_data):
@@ -31,7 +34,7 @@ if __name__ == '__main__':
         ord_str.extend(ord_str_k)
     num = '-'.join(ord_str)
 
-    output_dir = Path(f"/home/yuikasagi/Develop/exojax/output/multimol/{target}/{date}/hmc_wocloud_unilogg/")
+    output_dir = Path(f"/home/yuikasagi/Develop/exojax/output/multimol/{target}/{date}/hmc_unilogg/")
 
     file_samples = output_dir / f"samples_order{num}_1000.pickle"
     file_all = output_dir / f"all_order{num}.npz"
@@ -107,9 +110,12 @@ if __name__ == '__main__':
     n_params = len(params)
     n_data = len(np.concatenate(f_obs))
     dof = n_data - n_params
+
+    sigma = np.median(samples["sigma"])
+    print(sigma)
     
     # reduced chi square
-    chisq, red_chisq = reduced_chisquare(f_obs, flux_median_mu, f_obserr, dof)
+    chisq, red_chisq = reduced_chisquare(f_obs, flux_median_mu, f_obserr, sigma, dof)
     print("chi-square = ",chisq)
     print("reduced chi-square = ",red_chisq)
 

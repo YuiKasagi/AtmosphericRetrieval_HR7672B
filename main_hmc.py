@@ -6,14 +6,14 @@ modified by @YuiKasagi for Kasagi et al. (2025)
 - exojax version 1.5.1
 """
 
-""" 
+
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 #os.environ["XLA_PYTHON_CLIENT_PREALLOCATE"]="false"
 os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"]=".95"
 os.environ['XLA_PYTHON_CLIENT_ALLOCATOR']='platform'
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-
+""" 
 import sys
 sys.path.insert(0,'/home/yuikasagi/exojax/src')
 sys.path.insert(0,'/home/yuikasagi/radis')
@@ -72,7 +72,7 @@ band_unique = sorted(set(sum(band,[])))[::-1] ## sort y,h
 
 ## Paths
 path_obs, path_data, path_telluric, path_save = setting.set_path()
-save_dir = path_save+"/multimol/"+target+"/"+str(date)+"/hmc_wocloud_unilogg/"  ##CHECK!!
+save_dir = path_save+"/multimol/"+target+"/"+str(date)+"/hmc_wocloud/"  ##CHECK!!
 if not run:
     file_samples = save_dir+"/samples_order"+num+"_1000.pickle"
 
@@ -118,6 +118,7 @@ H_mag_obserr = 0.14
 ## Initial Parameters
 path_spec,path_spec_A = {}, {}
 if target == "HR7672B":
+    airmass_ratio = 1.024/1.148 # B/A = {20210625}/{20210607}
     # T0, alpha, RV, vsini, vtel
     boost0 = np.array([2100., 0.1, -20., 45., 1.])
     initpar0 = np.array([2100., 0.1, -20., 45., 0.])
@@ -174,7 +175,7 @@ for band_tmp in band_unique:
     # host star
     ld_obs_A_tmp, f_obs_A_tmp, f_obserr_A_tmp, _, _ = obs.spec(
         path_spec_A[band_tmp], path_telluric, band_tmp, np.array(ord_list)[ind_tmp], ord_norm=ord_norm[band_tmp], 
-        norm=False, lowermask=False)
+        norm=False, lowermask=False, airmass_ratio=airmass_ratio)
 
     ld_obs.extend(ld_obs_tmp)
     f_obs.extend(f_obs_tmp)
@@ -975,12 +976,13 @@ init = params*boost
 init_dic={}
 for i,par_name_i in enumerate(par_name):
     init_dic[par_name_i] = init[i]
+print(init_dic)
 init_strategy = init_to_value(values=init_dic)
 
 rng_key = random.PRNGKey(0)
 rng_key, rng_key_ = random.split(rng_key)
-num_warmup, num_samples = 2000,200 
-niter = 9 ## total_samples = num_samples * niter
+num_warmup, num_samples = 500,200 
+niter = 4 ## total_samples = num_samples * niter
 kernel = NUTS(model_c, init_strategy=init_strategy)
 mcmc = MCMC(kernel, num_warmup=num_warmup, num_samples=num_samples)
 
