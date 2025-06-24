@@ -1,5 +1,7 @@
 # AtmosphericRetrieval_HR7672B
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15702022.svg)](https://doi.org/10.5281/zenodo.15702022)
+
 This repository contains the retrieval analysis of the L dwarf HR 7672B observed with REACH/Subaru, as presented in Kasagi et al. (2025).
 
 The 1D spectra are available in the `data/` directory.
@@ -72,3 +74,9 @@ Finally, execute plothmc_models.py to generate the model plots.
 ```bash
 python plothmc_models.py
 ```
+
+## Citation
+
+If you use this code or data in your work, please cite the following Zenodo record:
+
+Kasagi, Yui. (2025). *Atmospheric retrieval of HR 7672 B: Python code and input data* (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.15702022
