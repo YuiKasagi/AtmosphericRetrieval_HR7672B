@@ -33,7 +33,10 @@ def spec(
     if CH4mask:
         read_args = {'header':None, 'names':['wav', 'order', 'flux', 'uncertainty']}
     else:
-        read_args = {'header':None, 'sep':'\s+', 'names':['wav', 'order', 'flux', 'uncertainty']}
+        if path_spec.endswith('photnoise.dat'):
+            read_args = {'header':None, 'sep':'\s+', 'names':['wav', 'order', 'flux', 'uncertainty']}
+        else:
+            read_args = {'header':None, 'sep':'\s+', 'names':['wav', 'order', 'flux', 'snr', 'uncertainty']}
     
     dat = pd.read_csv(path_spec, **read_args)
     ld_obs, ord, f_obs_lmd, f_obserr_lmd = dat['wav'], dat['order'], dat['flux'], dat['uncertainty']

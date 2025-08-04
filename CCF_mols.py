@@ -260,8 +260,12 @@ for mol_use_tmp in mol_use[0]:
     logvmr.append(np.median(samples[f"log{mol_use_tmp}"]))
 RV = np.median(samples["RV"])
 vsini = 0.1 #np.median(samples["vsini"])
-a = np.median(samples["a_y"]) #j band
-b = np.median(samples["b_y"]) * 1e-2#j band
+if band=="y": # linear trend has already been removed by subtracting model...?
+    a = np.median(samples["a_y"]) #j band
+    b = np.median(samples["b_y"]) * 1e-2#j band
+elif band=="h":
+    a = np.median(samples["a_h"]) #h band
+    b = np.median(samples["b_h"]) * 1e-2#h band  
 if fit_cloud:
     logPtop = np.median(samples["logPtop"])
 else:
@@ -358,7 +362,7 @@ from astropy.constants import c
 from scipy.interpolate import interp1d
 
 c_kms = c.to("km/s").value
-rv_grid = np.arange(-100, 101, 1)
+rv_grid = np.arange(-500, 501, 1)
 
 def ccf_scaling(wavelength_template, 
                 flux_template,
@@ -422,24 +426,131 @@ else:
 # %%
 fig,ax1=plt.subplots(figsize=(7,5))
 ax2 = ax1.twinx()
+
+norm_rv_ind = np.where(((-500<rv_grid)&(rv_grid<-100)) | ((100<rv_grid)&(rv_grid<500))) 
+norm_ccf_flux_rm_fullmodel = np.median(np.array(ccf_flux_rm_fullmodel)[norm_rv_ind])
+norm_ccf_flux_rm_mol = np.median(np.array(ccf_flux_rm_mol)[norm_rv_ind])
+
 ax1.plot(rv_grid, ccf_flux_rm_fullmodel, color="C0", alpha=0.8)
 ax1.plot(-200, 1, color="C1", alpha=0.8)
 ax2.plot(rv_grid, ccf_flux_rm_mol, color="C1", alpha=0.8)
 
-ax1.axvline(0,ls='--',color="k", lw=1.5)
-ax1.axvline(brv,ls='--',color="grey", lw=1.5)
+ax1.axvline(0,ls='--',color="k", lw=1.)
+ax1.axvline(brv,ls='--',color="grey", lw=1.)
 ax1.legend(
     [f"CCF of (data - model w/ {mol_use[0][0]}) & {mol_use[0][0]} template (Left y-axis)", 
      f"CCF of (data - model w/o {mol_use[0][0]}) & {mol_use[0][0]} template (Right y-axis)"],
      bbox_to_anchor=(-0.25, -0.2), loc='upper left'#, ncols=2
      )
 ax1.set(xlabel="Velocity shift [km/s]", ylabel="Normalized flux")
-ax1.set(xlim=(-100,100),ylim=(np.min(ccf_flux_rm_fullmodel)-0.001, np.min(ccf_flux_rm_fullmodel)+0.005))
-ax2.set(ylim=(np.min(ccf_flux_rm_mol)-0.001, np.min(ccf_flux_rm_mol)+0.005))
+ax1.set(xlim=(-500,500),ylim=(norm_ccf_flux_rm_fullmodel-0.0065, norm_ccf_flux_rm_fullmodel+0.0045))
+ax2.set(ylim=(norm_ccf_flux_rm_mol-0.0065, norm_ccf_flux_rm_mol+0.0045))
 
 if save:
     plt.savefig(output_dir / f"ccf_order{num}.png", bbox_inches='tight')#,dpi=300)
 else:
     plt.show()
 
+# %%
+#----------------#
+### S/N of CCF ###
+#----------------#
+"""
+def fit_poly(wav, flux):
+    ind_j = wav < 14000
+    ind_h = wav > 14000
+    flux_fit = []
+    for ind in [ind_j, ind_h]:
+        try:
+            wav_tmp = wav[ind]
+            flux_tmp = flux[ind]
+            coeff = np.polyfit(wav_tmp, flux_tmp, 1)
+            f = np.poly1d(coeff)
+            flux_fit.extend(f(wav_tmp))
+        except:
+            continue
+    return flux_fit
+
+tf_fit = fit_poly(tw, tf)
+df_rm_fullmodel_fit = fit_poly(dw, df_rm_fullmodel)
+df_rm_mol_fit = fit_poly(dw, df_rm_mol)
+
+def normalize_flux(flux, ferr, flux_fit):
+    flux = flux/flux_fit
+    flux -= np.mean(flux)
+    ferr /= flux_fit
+    return flux, ferr
+
+tf, _ = normalize_flux(tf, np.ones_like(tw), tf_fit)
+df_rm_fullmodel, df_err = normalize_flux(df_rm_fullmodel, df_err, df_rm_fullmodel_fit)
+df_rm_mol, _ = normalize_flux(df_rm_mol, df_err, df_rm_mol_fit)
+"""
+
+# high-pass filter to subtract continuum
+from scipy.ndimage import median_filter
+
+def high_pass_filter(flux, size=200):
+    continuum = median_filter(flux, size=size)
+    fig, ax = plt.subplots()
+    ax.plot(flux)
+    ax.plot(continuum)
+    plt.show()
+    flux_hpf = flux - continuum
+    return flux_hpf #- np.mean(flux_hpf)
+
+tf_filter = high_pass_filter(tf, size=10000)
+df_rm_fullmodel_filter = high_pass_filter(df_rm_fullmodel, size=1500)
+df_rm_mol_filter = high_pass_filter(df_rm_mol, size=1500)
+# %%
+tf = tf_filter
+df_rm_fullmodel = df_rm_fullmodel_filter
+df_rm_mol = df_rm_mol_filter
+# %%
+from PyAstronomy.pyasl import crosscorrRV
+
+rvmin = -1000.
+rvmax = 1000.
+drv = 1.
+
+# CCF of obs. spectrum
+rv_grid, ccf_flux_rm_fullmodel = crosscorrRV(dw, df_rm_fullmodel, tw, tf, rvmin, rvmax, drv, 
+                     skipedge=800, weights=1/df_err**2)
+_, ccf_flux_rm_mol = crosscorrRV(dw, df_rm_mol, tw, tf, rvmin, rvmax, drv, 
+                     skipedge=800, weights=1/df_err**2)
+_, acf = crosscorrRV(tw, tf, tw, tf, rvmin, rvmax, drv,
+                     skipedge=3500)
+
+noise_region = (rv_grid<-500) | (rv_grid>500)
+sigma_cc_noise = np.std(ccf_flux_rm_mol[noise_region])
+mean_cc_noise = np.mean(ccf_flux_rm_mol[noise_region])
+
+ccf_flux_rm_fullmodel_snr = (ccf_flux_rm_fullmodel - mean_cc_noise) / sigma_cc_noise
+ccf_flux_rm_mol_snr = (ccf_flux_rm_mol - mean_cc_noise) / sigma_cc_noise
+
+ind = np.array(range(len(rv_grid)))
+maxind = 1000#np.min(ind[~noise_region]) + np.argmax(ccf_flux_rm_mol_snr[~noise_region])
+print(rv_grid[maxind], ccf_flux_rm_mol_snr[maxind])
+acf_norm = acf[maxind]/ccf_flux_rm_mol_snr[maxind]
+
+fig,ax = plt.subplots(figsize=(8,5))
+ax.plot(rv_grid, ccf_flux_rm_fullmodel_snr, color="C1", alpha=0.8)
+ax.plot(rv_grid, ccf_flux_rm_mol_snr, color="C0", alpha=0.8)
+#ax.plot(rv_grid, acf/acf_norm, color="skyblue", ls="dashed", zorder=1, alpha=0.8)
+
+ax.axvline(0,ls='--',color="k", lw=1.)
+#ax.axvline(brv,ls='--',color="grey", lw=1.)
+
+ax.legend(
+    [f"CCF of (data - model w/ {mol_use[0][0]}) & {mol_use[0][0]} template", 
+     f"CCF of (data - model w/o {mol_use[0][0]}) & {mol_use[0][0]} template",
+     #f"ACF of {mol_use[0][0]} template (norm to CCF)"
+     ],
+     bbox_to_anchor=(0., -0.2), loc='upper left'#, ncols=2
+     )
+ax.set(xlabel="Velocity shift [km/s]", ylabel="S/N of CCF")
+ax.set(xlim=(rvmin, rvmax))
+if save:
+    plt.savefig(output_dir / f"ccf_order{num}_snr.png", bbox_inches='tight')#,dpi=300)
+else:
+    plt.show()
 # %%
